@@ -28,6 +28,8 @@ sanch-peft/
 
 Code under `core/` is intended to stay reusable and experiment-agnostic. Experiment-specific YAML files and launch scripts live under `experiments/`. The `weeks/` directory holds study notes and written result summaries rather than executable code.
 
+See `CODE_ARCHITECTURE.md` for the full directory structure and file-level breakdown.
+
 ## How to Run
 
 Install dependencies:

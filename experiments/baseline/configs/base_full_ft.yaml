@@ -1,0 +1,7 @@
+experiment_name: baseline_full_finetune
+model_name: gpt2
+dataset_name: imdb
+peft_method: full_ft
+learning_rate: 2.0e-5
+batch_size: 8
+num_epochs: 3

@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sanch-peft"
+version = "0.1.0"
+description = "A focused lab for parameter-efficient fine-tuning of large language models."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "Sanchayan Sarkar" }
+]
+keywords = ["llm", "peft", "lora", "qlora", "fine-tuning"]
+
+[tool.setuptools.packages.find]
+include = ["core*"]

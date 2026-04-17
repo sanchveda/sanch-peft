@@ -1,0 +1,13 @@
+experiment_name: lora_baseline
+model_name: gpt2
+dataset_name: imdb
+peft_method: lora
+learning_rate: 2.0e-4
+batch_size: 8
+num_epochs: 3
+lora_rank: 8
+lora_alpha: 16
+lora_dropout: 0.05
+target_modules:
+  - c_attn
+  - c_proj

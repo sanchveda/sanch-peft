@@ -1,67 +1,62 @@
 """
-LoRA scaffolding for source-code-first parameter-efficient fine-tuning.
+LoRA: Low-Rank Adaptation of frozen linear projections.
 
-LoRA, or Low-Rank Adaptation, freezes a pretrained weight matrix and learns a
-small low-rank update instead of updating the full parameter tensor. For a
-linear projection W, LoRA approximates the trainable delta as B @ A where A and
-B have a much smaller rank than the original layer dimensions.
-
-This module is intentionally a structural starter rather than a full
-implementation. It captures the interfaces and the main conceptual hooks
-required for a from-scratch LoRA implementation without committing the
-repository to a production-ready adapter injection path yet.
+For a pretrained linear projection W, LoRA freezes W and learns a low-rank
+update BA so that the adapted layer computes h = Wx + (alpha/r) * BAx.
 """
 
 from __future__ import annotations
 
-from torch import nn
+import math
+
+import torch
 
 
-class LoRALinear(nn.Module):
-    """Structural placeholder for a LoRA-wrapped linear layer."""
+class LoRALayer(torch.nn.Module):
+    """Low-rank adapter path: returns (alpha/r) * BAx, no base contribution."""
+
+    def __init__(self, in_dim: int, out_dim: int, rank: int, alpha: float):
+        super().__init__()
+        std_dev = 1.0 / math.sqrt(rank)
+        self.A = torch.nn.Parameter(torch.randn(in_dim, rank) * std_dev)
+        self.B = torch.nn.Parameter(torch.zeros(rank, out_dim))
+        self.scaling = alpha / rank
+
+    def forward(self, x):
+        return self.scaling * (x @ self.A @ self.B)
+
+
+class LoRALinear(torch.nn.Module):
+    """Linear layer with frozen base weights and an additive LoRA update."""
 
     def __init__(
         self,
-        base_linear: nn.Linear,
+        base_linear: torch.nn.Linear,
         rank: int,
         alpha: float,
         dropout: float,
     ) -> None:
         super().__init__()
         self.base_linear = base_linear
-        self.rank = rank
-        self.alpha = alpha
-        self.dropout = dropout
+        self.base_linear.weight.requires_grad = False
+        if self.base_linear.bias is not None:
+            self.base_linear.bias.requires_grad = False
 
-        # Base weights would be frozen here so the pretrained layer stays fixed.
-        # Example:
-        # self.base_linear.weight.requires_grad = False
-        # if self.base_linear.bias is not None:
-        #     self.base_linear.bias.requires_grad = False
-
-        # Low-rank matrices would be initialized here.
-        # Example conceptual shapes:
-        # A: [rank, in_features]
-        # B: [out_features, rank]
-        self.lora_A = None
-        self.lora_B = None
-
-        # Scaling would typically be defined as alpha / rank.
-        self.scaling = None
+        self.lora_dropout = (
+            torch.nn.Dropout(dropout) if dropout > 0 else torch.nn.Identity()
+        )
+        self.lora = LoRALayer(
+            in_dim=self.base_linear.in_features,
+            out_dim=self.base_linear.out_features,
+            rank=rank,
+            alpha=alpha,
+        )
 
     def forward(self, x):
-        """
-        Placeholder forward pass.
-
-        A future implementation should:
-        - compute the frozen base projection
-        - compute the LoRA low-rank update
-        - combine base output and scaled LoRA update
-        """
-        raise NotImplementedError("LoRALinear is a structural scaffold for now.")
+        return self.base_linear(x) + self.lora(self.lora_dropout(x))
 
 
-def apply_lora_to_model(model: nn.Module, config: dict) -> nn.Module:
+def apply_lora_to_model(model: torch.nn.Module, config: dict) -> torch.nn.Module:
     """
     Placeholder hook for attaching LoRA modules to a model.
 

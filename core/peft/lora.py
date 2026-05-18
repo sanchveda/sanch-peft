@@ -56,15 +56,53 @@ class LoRALinear(torch.nn.Module):
         return self.base_linear(x) + self.lora(self.lora_dropout(x))
 
 
-def apply_lora_to_model(model: torch.nn.Module, config: dict) -> torch.nn.Module:
-    """
-    Placeholder hook for attaching LoRA modules to a model.
+def apply_lora_to_model(
+    model: torch.nn.Module,
+    target_modules: list[str],
+    rank: int,
+    alpha: float,
+    dropout: float,
+) -> torch.nn.Module:
+    """Replace matching nn.Linear layers with LoRALinear; freeze the rest. In-place.
 
-    A later implementation can:
-    - identify target modules from `config["target_modules"]`
-    - replace supported `nn.Linear` layers with `LoRALinear`
-    - freeze the correct base parameters
-    - return the adapted model ready for training
+    target_modules is a list of dotted-name suffixes. A module matches if its
+    full name in named_modules() ends with any string in the list. e.g.
+    target_modules=['c_attn'] matches 'transformer.h.0.attn.c_attn'.
+    target_modules=['attn.c_proj'] matches attention output projections but
+    excludes 'mlp.c_proj'.
+
+    Raises ValueError if no targets match — a silent no-op would produce a
+    confusing "no trainable params" crash later in train().
     """
-    _ = config
+    for param in model.parameters():
+        param.requires_grad = False
+
+    swaps = [
+        (name, module)
+        for name, module in model.named_modules()
+        if isinstance(module, torch.nn.Linear)
+        and any(name.endswith(target) for target in target_modules)
+    ]
+    if not swaps:
+        raise ValueError(
+            f"No torch.nn.Linear modules matched target_modules={target_modules}. "
+            "Verify the suffixes match names in model.named_modules()."
+        )
+    for name, base_linear in swaps:
+        parent_name, attr_name = name.rsplit(".", 1) if "." in name else ("", name)
+        parent = model.get_submodule(parent_name) if parent_name else model
+        setattr(
+            parent,
+            attr_name,
+            LoRALinear(base_linear, rank=rank, alpha=alpha, dropout=dropout),
+        )
     return model
+
+
+def count_trainable_params(model: torch.nn.Module) -> tuple[int, int]:
+    """Return (trainable_count, total_count). For LoRA, trainable << total."""
+    total = sum(param.numel() for param in model.parameters())
+    trainable = sum(
+        param.numel() for param in model.parameters() if param.requires_grad
+    )
+    return trainable, total

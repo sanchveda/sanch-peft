@@ -15,3 +15,7 @@ keywords = ["llm", "peft", "lora", "qlora", "fine-tuning"]
 
 [tool.setuptools.packages.find]
 include = ["core*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
